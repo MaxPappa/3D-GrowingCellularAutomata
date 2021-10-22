@@ -1,17 +1,25 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
+from torch.utils.data.dataloader import DataLoader
 import pytorch_lightning as pl
 from visualizationUtils import visualizeGO
+from voxelDataset import voxelDataset
+from typing import Union, Dict
+from Config import Config
+from dataclasses import asdict
+from random import randint
 
-class LitCAModel(pl.LightningModule):
-    def __init__(self, channel_n, fire_rate, hidden_size=128):
-        super(LitCAModel, self).__init__()
-        self.channel_n = channel_n
-        self.fire_rate = fire_rate
-        self.fc0 = nn.Linear(channel_n*4, hidden_size)
-        self.fc1 = nn.Linear(hidden_size, channel_n, bias=False)
+class CAModel(pl.LightningModule):
+    def __init__(self, hparams: Union[Dict, Config], min_step:int = 50, max_step: int = 95):
+        super(CAModel, self).__init__()
+
+        self.save_hyperparameters(asdict(hparams) if not isinstance(hparams, Dict) else hparams)
+        self.min_step = min_step
+        self.max_step = max_step
+
+        self.fc0 = nn.Linear(self.hparams["n_channels"]*4, self.hparams["hidden_size"])
+        self.fc1 = nn.Linear(self.hparams["hidden_size"], self.hparams["n_channels"], bias=False)
         with torch.no_grad():
             self.fc1.weight.zero_()
         self.automatic_optimization = True
@@ -22,8 +30,8 @@ class LitCAModel(pl.LightningModule):
     def perceive(self, x, angle):
 
         def _perceive_with(x, kernel):
-            kernel = kernel[None,None,...].repeat(self.channel_n, 1, 1, 1, 1)
-            return F.conv3d(x, kernel, padding=1, groups=self.channel_n)
+            kernel = kernel[None,None,...].repeat(self.n_channels, 1, 1, 1, 1)
+            return F.conv3d(x, kernel, padding=1, groups=self.n_channels)
 
         kernel_x = torch.tensor([[[1, 2, 1], [0, 0, 0], [-1, -2, -1]],
                              [[2, 4, 2], [0, 0, 0], [-2, -4, -2]],
@@ -37,7 +45,7 @@ class LitCAModel(pl.LightningModule):
         y = torch.cat((x,y1,y2,y3),1)
         return y
 
-    def update(self, x, fire_rate, angle):
+    def update(self, x:torch.tensor, fire_rate:float, angle:float = 0) -> torch.tensor:
         x = x.transpose(1,4)
         mask = x[:, 3:4, :, :, :]
         pre_life_mask = self.alive(x)
@@ -61,7 +69,7 @@ class LitCAModel(pl.LightningModule):
         x = x * life_mask
         return x.transpose(1,4)
 
-    def forward(self, x, steps=1, fire_rate=None, angle=0.0, path=None):
+    def forward(self, x:torch.tensor, steps:int=1, fire_rate:float=0.0, angle:float=0.0, path:str=None) -> torch.tensor:
         for step in range(steps):
             x = self.update(x, fire_rate, angle)
             if path:
@@ -69,16 +77,23 @@ class LitCAModel(pl.LightningModule):
                 fig.write_image(f"{path}_{step}.png")
         return x
 
-    def training_step(self, train_batch, batch_idx):
-        x, targ = train_batch
-        loss = F.mse_loss(x[:, :, :, :, :4], targ[:,:,:,:,:4])
-        self.log('train_loss', loss)
+    def training_step(self, train_batch:torch.tensor, batch_idx:int) -> float:
+        x, target = train_batch
+        for step in randint(self.min_step, self.max_step+1):
+            x = self.update(x, self.hparams['fire_rate'])
+        loss = F.mse_loss(x[:, :, :, :, :4], target[:,:,:,:,:4])
+        self.log("train_loss", loss)
         return loss
 
     def configure_optimizers(self):
-        betas = (0.5, 0.5)
-        lr = 2e-3
-        lr_gamma = 0.9999
-        optimizer = torch.optim.Adam(self.parameters, lr=lr, betas=betas)
-        scheduler = optim.lr_scheduler.ExponentialLR(optimizer, lr_gamma)
+        optimizer = torch.optim.Adam(self.parameters, lr=self.hparams["lr"], betas=self.haprams["betas"])
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, self.hparams["lr_gamma"])
         return optimizer, scheduler
+
+    def train_dataloader(self) -> DataLoader:
+        train_loader = DataLoader(
+            voxelDataset(self.haparams["pathFile"], self.hparams["n_channels"], self.hparams["pool_size"]),
+            batch_size=self.hparams["batch_size"],
+            num_workers=self.hparams["n_cpu"]
+            )
+        return train_loader
