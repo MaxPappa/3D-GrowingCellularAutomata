@@ -1,22 +1,31 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import dataloader
 from torch.utils.data.dataloader import DataLoader
 import pytorch_lightning as pl
 from visualizationUtils import visualizeGO
 from voxelDataset import voxelDataset
-from typing import Union, Dict
-from Config import Config
+from typing import Union, Dict, List
+from Config import ModelConfig
 from dataclasses import asdict
 from random import randint
+from PoolSamplerCallback import *
+import pdb
 
 class CAModel(pl.LightningModule):
-    def __init__(self, hparams: Union[Dict, Config], min_step:int = 50, max_step: int = 95):
+    def __init__(self, hparams: Union[Dict, ModelConfig], min_step:int = 50, max_step: int = 95):
         super(CAModel, self).__init__()
 
         self.save_hyperparameters(asdict(hparams) if not isinstance(hparams, Dict) else hparams)
         self.min_step = min_step
         self.max_step = max_step
+
+        # # done for convenience and can be done just because each model is tailored on a single 3D object
+        # self.dataset = voxelDataset(
+        #     self.hparams["filePath"], self.hparams["n_channels"],
+        #     self.hparams["pool_size"], self.hparams['batch_size']
+        #     )
 
         self.fc0 = nn.Linear(self.hparams["n_channels"]*4, self.hparams["hidden_size"])
         self.fc1 = nn.Linear(self.hparams["hidden_size"], self.hparams["n_channels"], bias=False)
@@ -30,8 +39,8 @@ class CAModel(pl.LightningModule):
     def perceive(self, x, angle):
 
         def _perceive_with(x, kernel):
-            kernel = kernel[None,None,...].repeat(self.n_channels, 1, 1, 1, 1)
-            return F.conv3d(x, kernel, padding=1, groups=self.n_channels)
+            kernel = kernel[None,None,...].repeat(self.hparams.n_channels, 1, 1, 1, 1)
+            return F.conv3d(x, kernel, padding=1, groups=self.hparams.n_channels)
 
         kernel_x = torch.tensor([[[1, 2, 1], [0, 0, 0], [-1, -2, -1]],
                              [[2, 4, 2], [0, 0, 0], [-2, -4, -2]],
@@ -57,7 +66,7 @@ class CAModel(pl.LightningModule):
         dx = self.fc1(dx)
 
         if fire_rate is None:
-            fire_rate=self.fire_rate
+            fire_rate=self.hparams.fire_rate
         stochastic = torch.rand([dx.size(0),dx.size(1),dx.size(2), dx.size(3),1])>fire_rate
         stochastic = stochastic.float().to(self.device)
         dx = dx * stochastic
@@ -78,22 +87,27 @@ class CAModel(pl.LightningModule):
         return x
 
     def training_step(self, train_batch:torch.tensor, batch_idx:int) -> float:
-        x, target = train_batch
-        for step in randint(self.min_step, self.max_step+1):
+        #pdb.set_trace()
+        x, target = train_batch[0]
+        for step in range(self.min_step, self.max_step+1):
             x = self.update(x, self.hparams['fire_rate'])
         loss = F.mse_loss(x[:, :, :, :, :4], target[:,:,:,:,:4])
         self.log("train_loss", loss)
         return loss
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters, lr=self.hparams["lr"], betas=self.haprams["betas"])
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams["lr"], betas=self.hparams["betas"])
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, self.hparams["lr_gamma"])
-        return optimizer, scheduler
+        return {"optimizer":optimizer, "lr_scheduler":scheduler}
 
-    def train_dataloader(self) -> DataLoader:
-        train_loader = DataLoader(
-            voxelDataset(self.haparams["pathFile"], self.hparams["n_channels"], self.hparams["pool_size"]),
-            batch_size=self.hparams["batch_size"],
-            num_workers=self.hparams["n_cpu"]
-            )
-        return train_loader
+    def configure_callbacks(self) -> List[pl.Callback]:
+        swap_tensor = PoolSamplerCallback()
+        return [swap_tensor]
+    
+    # def train_dataloader(self) -> DataLoader:
+    #     train_loader = DataLoader(
+    #         self.dataset,#voxelDataset(self.haparams["pathFile"], self.hparams["n_channels"], self.hparams["pool_size"]),
+    #         batch_size=self.hparams["batch_size"],
+    #         num_workers=self.hparams["n_cpu"]
+    #         )
+    #     return train_loader
