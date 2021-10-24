@@ -1,17 +1,13 @@
+from pytorch_lightning import callbacks
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import dataloader
-from torch.utils.data.dataloader import DataLoader
 import pytorch_lightning as pl
 from visualizationUtils import visualizeGO
-from voxelDataset import voxelDataset
 from typing import Union, Dict, List
 from Config import ModelConfig
 from dataclasses import asdict
-from random import randint
 from PoolSamplerCallback import *
-import pdb
 
 class CAModel(pl.LightningModule):
     def __init__(self, hparams: Union[Dict, ModelConfig], min_step:int = 50, max_step: int = 95):
@@ -20,12 +16,6 @@ class CAModel(pl.LightningModule):
         self.save_hyperparameters(asdict(hparams) if not isinstance(hparams, Dict) else hparams)
         self.min_step = min_step
         self.max_step = max_step
-
-        # # done for convenience and can be done just because each model is tailored on a single 3D object
-        # self.dataset = voxelDataset(
-        #     self.hparams["filePath"], self.hparams["n_channels"],
-        #     self.hparams["pool_size"], self.hparams['batch_size']
-        #     )
 
         self.fc0 = nn.Linear(self.hparams["n_channels"]*4, self.hparams["hidden_size"])
         self.fc1 = nn.Linear(self.hparams["hidden_size"], self.hparams["n_channels"], bias=False)
@@ -44,7 +34,7 @@ class CAModel(pl.LightningModule):
 
         kernel_x = torch.tensor([[[1, 2, 1], [0, 0, 0], [-1, -2, -1]],
                              [[2, 4, 2], [0, 0, 0], [-2, -4, -2]],
-                             [[1, 2, 1], [0, 0, 0], [-1, -2, -1]]]) / 26
+                             [[1, 2, 1], [0, 0, 0], [-1, -2, -1]]]).to("cuda") / 26
         kernel_y = kernel_x.transpose(0,1)
         kernel_z = kernel_x.transpose(1,2)
 
@@ -87,13 +77,12 @@ class CAModel(pl.LightningModule):
         return x
 
     def training_step(self, train_batch:torch.tensor, batch_idx:int) -> float:
-        #pdb.set_trace()
         x, target = train_batch[0]
         for step in range(self.min_step, self.max_step+1):
             x = self.update(x, self.hparams['fire_rate'])
         loss = F.mse_loss(x[:, :, :, :, :4], target[:,:,:,:,:4])
         self.log("train_loss", loss)
-        return loss
+        return {"loss":loss, "out":x}
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams["lr"], betas=self.hparams["betas"])
@@ -101,13 +90,5 @@ class CAModel(pl.LightningModule):
         return {"optimizer":optimizer, "lr_scheduler":scheduler}
 
     def configure_callbacks(self) -> List[pl.Callback]:
-        swap_tensor = PoolSamplerCallback()
-        return [swap_tensor]
-    
-    # def train_dataloader(self) -> DataLoader:
-    #     train_loader = DataLoader(
-    #         self.dataset,#voxelDataset(self.haparams["pathFile"], self.hparams["n_channels"], self.hparams["pool_size"]),
-    #         batch_size=self.hparams["batch_size"],
-    #         num_workers=self.hparams["n_cpu"]
-    #         )
-    #     return train_loader
+        callbacks = [PoolSamplerCallback()]
+        return callbacks
