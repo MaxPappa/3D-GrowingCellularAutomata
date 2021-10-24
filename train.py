@@ -11,6 +11,6 @@ if __name__ == '__main__':
     ca_model = CAModel.CAModel(cfgModel)
     data_module = vdm.VoxelDataModule(cfgData)
     
-    trainer = Trainer(accelerator="cpu")
+    trainer = Trainer(devices=1, accelerator="gpu", log_every_n_steps=1)
     trainer.fit(ca_model, datamodule=data_module)
     #trainer = Trainer(ca_model, reload_dataloaders_every_n_epoch=1)
