@@ -13,15 +13,15 @@ def readPLY(path: str) -> np.ndarray:
     xyz = xyz.astype(int)
     
     arr = np.zeros((xyz[:,0].max()+1, xyz[:,1].max()+1, xyz[:,2].max()+1))
-    #arr = arr - 1
+    arr = arr - 1
     arr = np.stack([arr,arr,arr])
     for coords,col in zip(xyz, colors):
         arr[:,coords[0], coords[1], coords[2]] = col[:]
     arr = np.einsum('abcd -> bcda', arr)
 
-    masked = np.ma.masked_where((arr[...,0]+arr[...,1]+arr[...,2])>=0,arr[...,0])
+    masked = np.ma.masked_where((arr[...,0]+arr[...,1]+arr[...,2])>0,arr[...,0])
     arr=np.append(arr,masked.mask.astype(int)[...,None], axis=3)
-    #arr[arr==-1]=0
+    arr[arr==-1]=0
     return arr.astype(np.float32)
 
 
