@@ -1,4 +1,3 @@
-from pytorch_lightning import callbacks
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,7 +6,7 @@ from visualizationUtils import visualizeGO
 from typing import Union, Dict, List
 from Config import ModelConfig
 from dataclasses import asdict
-from PoolSamplerCallback import *
+from MyCallbacks import PoolSamplerCallback
 
 class CAModel(pl.LightningModule):
     def __init__(self, hparams: Union[Dict, ModelConfig], min_step:int = 50, max_step: int = 95):
@@ -34,7 +33,7 @@ class CAModel(pl.LightningModule):
 
         kernel_x = torch.tensor([[[1, 2, 1], [0, 0, 0], [-1, -2, -1]],
                              [[2, 4, 2], [0, 0, 0], [-2, -4, -2]],
-                             [[1, 2, 1], [0, 0, 0], [-1, -2, -1]]]).to("cuda") / 26
+                             [[1, 2, 1], [0, 0, 0], [-1, -2, -1]]], device=self.hparams.device) / 26
         kernel_y = kernel_x.transpose(0,1)
         kernel_z = kernel_x.transpose(1,2)
 
@@ -82,7 +81,18 @@ class CAModel(pl.LightningModule):
             x = self.update(x, self.hparams['fire_rate'])
         loss = F.mse_loss(x[:, :, :, :, :4], target[:,:,:,:,:4])
         self.log("train_loss", loss)
-        return {"loss":loss, "out":x}
+        return {"loss":loss, "out":x.detach()}
+
+    def validation_step(self, batch, batch_idx):
+        x, target = batch
+        for step in range(self.min_step, self.max_step+1):
+            x = self.update(x, self.hparams['fire_rate'])
+        loss = F.mse_loss(x[:, :, :, :, :4], target[:,:,:,:,:4])
+
+        result = pl.EvalResult(checkpoint_on=loss)
+        result.log('val_loss', loss)
+        return {"loss":loss, "out":x.detach()}
+        #return result
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams["lr"], betas=self.hparams["betas"])

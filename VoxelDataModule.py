@@ -1,4 +1,5 @@
 import pytorch_lightning as pl
+from torch.functional import Tensor
 from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import DataLoader
 from voxelDataset import voxelDataset
@@ -31,11 +32,14 @@ class VoxelDataModule(pl.LightningDataModule):
 
     def setup(self, stage):
         self.train_data = TensorDataset(self.pool, self.pool_target)# torch.from_numpy(self.target))
+        self.val_data = TensorDataset(self.seed, self.target)
 
     def train_dataloader(self):
         self.train_data = TensorDataset(self.pool, self.pool_target) # reload at each epoch setting Trainer flag "reload_dataloaders_every_n_epocs=1"
         return [DataLoader(self.train_data, batch_size=self.hparams.batch_size)]#self.hparams["batch_size"])
 
+    def val_dataloader(self):
+        return [DataLoader(self.val_data)]
 
     def on_before_batch_transfer(self, batch: torch.tensor, dataloader_idx: int) -> torch.tensor:
         # calculate loss between initial batch and target, sort their indexes (in the batch) in ascending order

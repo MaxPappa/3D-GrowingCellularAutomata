@@ -18,6 +18,7 @@ class ModelConfig:
     hidden_size: int = 128
     # dataloader parameters
     n_cpu: int = 8  # number of cpu threads to use for the dataloaders
+    device: str = "cuda"
 
 @dataclass
 class DataModuleConfig:
