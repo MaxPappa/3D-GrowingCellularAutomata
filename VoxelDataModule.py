@@ -2,14 +2,13 @@ import pytorch_lightning as pl
 from torch.functional import Tensor
 from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import DataLoader
-from voxelDataset import voxelDataset
 from typing import Union, Dict
 from Config import DataModuleConfig
 from dataclasses import asdict
 from utils import readPLY, getCentroid
 import numpy as np
 import torch
-#import pdb
+
 
 
 class VoxelDataModule(pl.LightningDataModule):
