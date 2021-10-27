@@ -170,7 +170,7 @@ def visualizeImprovements(output: torch.tensor, groundTruth: torch.tensor):
     x,y,z = np.indices(out.shape[:-1])
     specs = [{"type":"scene"} for i in range(0,2)]
     fig = make_subplots(rows=1, cols=2, specs=[specs])
-
+    
     maskTmp = out[:,:,:,3:4].squeeze()
     masked = np.ma.masked_where((maskTmp)>0.1,maskTmp)
     colors = to_rgb(out)
@@ -180,7 +180,6 @@ def visualizeImprovements(output: torch.tensor, groundTruth: torch.tensor):
             marker=dict(color=colors[masked.mask],size=2,symbol='square',sizemode='area')
         ), row=1, col=1
     )
-    
     maskTmp = gt[:,:,:,3:4].squeeze()
     masked = np.ma.masked_where((maskTmp)>0.1,maskTmp)
     colors = to_rgb(gt)
@@ -190,5 +189,4 @@ def visualizeImprovements(output: torch.tensor, groundTruth: torch.tensor):
             marker=dict(color=colors[masked.mask],size=2,symbol='square',sizemode='area')
         ), row=1, col=2
     )
-
     return fig

@@ -7,6 +7,7 @@ from typing import Union, Dict, List
 from Config import ModelConfig
 from dataclasses import asdict
 from MyCallbacks import PoolSamplerCallback
+from random import randint
 
 class CAModel(pl.LightningModule):
     def __init__(self, hparams: Union[Dict, ModelConfig], min_step:int = 50, max_step: int = 95):
@@ -77,22 +78,11 @@ class CAModel(pl.LightningModule):
 
     def training_step(self, train_batch:torch.tensor, batch_idx:int) -> float:
         x, target = train_batch[0]
-        for step in range(self.min_step, self.max_step+1):
+        for step in range(0, randint(self.min_step, self.max_step+1)):
             x = self.update(x, self.hparams['fire_rate'])
         loss = F.mse_loss(x[:, :, :, :, :4], target[:,:,:,:,:4])
         self.log("train_loss", loss)
         return {"loss":loss, "out":x.detach()}
-
-    def validation_step(self, batch, batch_idx):
-        x, target = batch
-        for step in range(self.min_step, self.max_step+1):
-            x = self.update(x, self.hparams['fire_rate'])
-        loss = F.mse_loss(x[:, :, :, :, :4], target[:,:,:,:,:4])
-
-        result = pl.EvalResult(checkpoint_on=loss)
-        result.log('val_loss', loss)
-        return {"loss":loss, "out":x.detach()}
-        #return result
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams["lr"], betas=self.hparams["betas"])
