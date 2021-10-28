@@ -1,4 +1,3 @@
-from numpy.core.numeric import indices
 import pytorch_lightning as pl
 import torch
 from visualizationUtils import visualizeImprovements, visualizePatterns

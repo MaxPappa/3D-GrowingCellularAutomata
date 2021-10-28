@@ -1,6 +1,5 @@
-from os import truncate
 import CAModel
-from pytorch_lightning import Trainer, plugins
+from pytorch_lightning import Trainer
 import Config
 import VoxelDataModule as vdm
 import numpy as np
@@ -30,7 +29,7 @@ if __name__ == '__main__':
     data_module = vdm.VoxelDataModule(cfgData)
 
     wandb_logger = WandbLogger(project="lit-3D-Grow")
-    
+
     trainer = Trainer(devices=1, accelerator="gpu", log_every_n_steps=1, reload_dataloaders_every_n_epochs=1,
             default_root_dir="./checkpoints/", logger=wandb_logger,
             callbacks=[GrowImprovementPerEpochLogger(seed=seed, target=target)],
