@@ -1,6 +1,6 @@
 from os import truncate
 import CAModel
-from pytorch_lightning import Trainer
+from pytorch_lightning import Trainer, plugins
 import Config
 import VoxelDataModule as vdm
 import numpy as np
@@ -33,6 +33,7 @@ if __name__ == '__main__':
     
     trainer = Trainer(devices=1, accelerator="gpu", log_every_n_steps=1, reload_dataloaders_every_n_epochs=1,
             default_root_dir="./checkpoints/", logger=wandb_logger,
-            callbacks=[GrowImprovementPerEpochLogger(seed=seed, target=target)]
+            callbacks=[GrowImprovementPerEpochLogger(seed=seed, target=target)],
+            accumulate_grad_batches=2
             )
     trainer.fit(ca_model, datamodule=data_module)
