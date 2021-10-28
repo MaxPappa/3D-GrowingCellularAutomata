@@ -41,7 +41,7 @@ def visualizeImprovements(output: torch.tensor, groundTruth: torch.tensor):
 def visualizePatterns(inpBatch: torch.tensor, num: int):
     inp = inpBatch.detach().cpu().numpy()
     x,y,z = np.indices(inp[0].shape[:-1])
-    rows = num//4
+    rows = num//2
     cols = num//rows
     specs = [{"type":"scene"} for i in range(0,cols)]
     fig = make_subplots(rows=rows, cols=cols, specs=[specs for i in range(0,rows)])
