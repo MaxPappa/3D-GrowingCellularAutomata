@@ -39,9 +39,9 @@ class VoxelDataModule(pl.LightningDataModule):
         return [DataLoader(self.train_data, batch_size=self.hparams.batch_size, num_workers=self.hparams.num_workers)]#self.hparams["batch_size"])
 
     def on_before_batch_transfer(self, batch: torch.tensor, dataloader_idx: int) -> torch.tensor:
-        # calculate loss between initial batch and target, sort their indexes (in the batch) in ascending order
-        # using calculated loss, then take the last one (which has the lower loss in the batch)
+        # calculate loss between initial batch and target, sort their indexes (in the batch) in descending order
+        # using calculated loss, then take the first one (which has the highest loss in the batch)
         with torch.no_grad():
-            idx_worst = torch.mean(torch.pow(batch[0][0][..., :4] - self.target, 2), [-1,-2,-3,-4]).argsort(descending=False)[:1]
+            idx_worst = torch.mean(torch.pow(batch[0][0][..., :4] - self.target, 2), [-1,-2,-3,-4]).argsort(descending=True)[:1]
             batch[0][0][idx_worst] = self.seed.clone()
         return batch
