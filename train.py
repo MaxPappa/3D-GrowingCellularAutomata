@@ -6,7 +6,7 @@ import numpy as np
 from utils import readPLY, getCentroid
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-from MyCallbacks import GrowImprovementPerEpochLogger
+from MyCallbacks import GrowImprovementPerEpochLogger, PoolPatternSampleCallback
 import torch
 
 if __name__ == '__main__':
