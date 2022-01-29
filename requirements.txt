@@ -1,3 +1,5 @@
-open3d
-pytorch-lightning
-wandb
+open3d==0.14.1
+pytorch_lightning==1.5.9
+wandb==0.12.9
+torch==1.10.1
+plotly==5.5.0
