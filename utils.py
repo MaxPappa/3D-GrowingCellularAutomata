@@ -36,7 +36,6 @@ def getCentroid(listCoords):
     sumZ /= len(listCoords)
     lst = list()
     for c in listCoords:
-        #print(c, int(c[0])
         lst += [abs(int(c[0])-sumX +  int(c[1])-sumY + int(c[2])-sumZ)]
     val = min(lst)
     return listCoords[lst.index(val)+len(listCoords)//2]

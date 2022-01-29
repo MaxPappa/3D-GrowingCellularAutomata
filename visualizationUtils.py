@@ -50,8 +50,7 @@ def visualizePatterns(inpBatch: torch.tensor, num: int):
         for j in range(1,cols+1):
             maskTmp = inp[idx:idx+1,:,:,:,3:4].squeeze()
             masked = np.ma.masked_where((maskTmp)>0.1,maskTmp)
-            colors = to_rgb(inp[idx:idx+1])
-            
+            colors = to_rgb(inp[idx:idx+1].squeeze())
             fig.add_trace(
                 go.Scatter3d(
                     x=x[masked.mask], y=y[masked.mask], z=z[masked.mask], mode='markers',
@@ -60,3 +59,34 @@ def visualizePatterns(inpBatch: torch.tensor, num: int):
             )
             idx += 1
     return fig
+
+
+
+def visualizeGO(growedObject: torch.tensor, toSave: bool = False):
+    grow = growedObject.detach().cpu().numpy()
+    x,y,z = np.indices(grow.shape[:-1])
+    maskTmp = grow[:,:,:,3:4].squeeze()
+    masked = np.ma.masked_where((maskTmp)>0.1,maskTmp)
+    colors = to_rgb(grow)
+
+    fig = go.Figure(
+        data=[
+            go.Scatter3d(
+                x=x[masked.mask], y=y[masked.mask], z=z[masked.mask], 
+                mode='markers',
+                marker=dict(color=colors[masked.mask],size=2,symbol='square',sizemode='area')
+            )
+        ],
+        layout=dict(
+            scene=dict(xaxis=dict(visible=True),yaxis=dict(visible=True),zaxis=dict(visible=True)), template='plotly'
+        )
+    )
+    camera = dict(
+    eye=dict(x=-.75, y=2.25, z=.2)
+    )
+    fig.update_layout(autosize=False, width=250, height=250, margin=dict(l=0,r=0,t=0,b=0), scene_camera=camera)#, template='plotly')
+    return fig
+    if toSave:
+        return fig
+    else:
+        fig.show()
