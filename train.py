@@ -5,6 +5,7 @@ import VoxelDataModule as vdm
 import numpy as np
 from utils import readPLY, getCentroid
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
 from MyCallbacks import GrowImprovementPerEpochLogger
 import torch
 
@@ -25,14 +26,25 @@ if __name__ == '__main__':
     seed = torch.from_numpy(seed).to(cfgModel.device)
     target = torch.from_numpy(target).to(cfgModel.device)
 
-    ca_model = CAModel.CAModel(cfgModel)
+    ca_model = CAModel.CAModel(cfgModel, min_step=120, max_step=160)
     data_module = vdm.VoxelDataModule(cfgData)
 
     wandb_logger = WandbLogger(project="lit-3D-Grow")
 
-    trainer = Trainer(devices=1, accelerator="gpu", log_every_n_steps=1, reload_dataloaders_every_n_epochs=1,
+
+    checkpoint_callback = ModelCheckpoint(
+        monitor="loss_from_seed",
+        dirpath="./checkpoints/",
+        filename="3DCellularGrow-{epoch:02d}-{loss_from_seed:.2f}",
+        save_top_k=3,
+        mode="min",
+    )
+
+    trainer = Trainer(devices=1, accelerator="gpu", log_every_n_steps=1, reload_dataloaders_every_n_epochs=2,
+            max_epochs=ca_model.hparams.n_epochs,
             default_root_dir="./checkpoints/", logger=wandb_logger,
-            callbacks=[GrowImprovementPerEpochLogger(seed=seed, target=target)],
-            accumulate_grad_batches=2
+            callbacks=[checkpoint_callback, GrowImprovementPerEpochLogger(seed=seed, target=target), PoolPatternSampleCallback()],
+            precision=16, progress_bar_refresh_rate=2, #accumulate_grad_batches=2
             )
+
     trainer.fit(ca_model, datamodule=data_module)
