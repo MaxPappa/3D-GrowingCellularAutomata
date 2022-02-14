@@ -17,27 +17,35 @@ class CAModel(pl.LightningModule):
         self.save_hyperparameters(asdict(hparams) if not isinstance(hparams, Dict) else hparams)
         self.min_step = min_step
         self.max_step = max_step
-
-        self.fc0 = weight_norm(nn.Linear(self.hparams["n_channels"]*4, self.hparams["hidden_size"]))
+        self.fc0 = weight_norm(nn.Linear((self.hparams["n_channels"]*4), self.hparams["hidden_size"]))
         self.fc1 = nn.Linear(self.hparams["hidden_size"], self.hparams["n_channels"], bias=False)
         with torch.no_grad():
             self.fc1.weight.zero_()
         self.automatic_optimization = True
 
-        kernel = torch.tensor([[[1, 2, 1], [0, 0, 0], [-1, -2, -1]],
-                                      [[2, 4, 2], [0, 0, 0], [-2, -4, -2]],
-                                      [[1, 2, 1], [0, 0, 0], [-1, -2, -1]]]) / 26
+        kernel = torch.tensor([[[-1,  0,  1],
+                [-2,  0,  2],
+                [-1,  0,  1]],
+
+                [[-2,  0, 2],
+                [-4,  0,  4],
+                [-2,  0,  2]],
+
+                [[-1,  0,  1],
+                [-2,  0,  2],
+                [-1,  0,  1]]]) / 26
+        
         self.register_buffer("kernel_x", kernel[None,None,...].repeat(self.hparams.n_channels,1,1,1,1))
 
-        self.register_buffer("kernel_y", kernel.transpose(0,1)[None,None,...].repeat(self.hparams.n_channels,1,1,1,1))
+        self.register_buffer("kernel_y", kernel.transpose(1,2)[None,None,...].repeat(self.hparams.n_channels,1,1,1,1))
 
-        self.register_buffer("kernel_z", kernel.transpose(1,2)[None,None,...].repeat(self.hparams.n_channels,1,1,1,1))
+        self.register_buffer("kernel_z", kernel.transpose(0,2)[None,None,...].repeat(self.hparams.n_channels,1,1,1,1))
 
 
     def alive(self, x):
         return F.max_pool3d(x[:, 3:4, :, :, :], kernel_size=3, stride=1, padding=1) > 0.1
 
-    def perceive(self, x, angle):
+    def perceive(self, x):
 
         def _perceive_with(x, kernel):
             return F.conv3d(x, kernel, padding=1, groups=self.hparams.n_channels)
@@ -49,12 +57,12 @@ class CAModel(pl.LightningModule):
         y = torch.cat((x,y1,y2,y3),1)
         return y
 
-    def update(self, x:torch.tensor, fire_rate:float, angle:float = 0) -> torch.tensor:
+    def update(self, x:torch.tensor, fire_rate:float) -> torch.tensor:
         x = x.transpose(1,4)
-        mask = x[:, 3:4, :, :, :]
+        # mask = x[:, 3:4, :, :, :]
         pre_life_mask = self.alive(x)
 
-        dx = self.perceive(x, angle)
+        dx = self.perceive(x)
         dx = dx.transpose(1,4)
         dx = self.fc0(dx)
         dx = F.relu(dx)
@@ -73,27 +81,20 @@ class CAModel(pl.LightningModule):
         x = x * life_mask
         return x.transpose(1,4)
 
-    def forward(self, x:torch.tensor, steps:int=1, fire_rate:float=0.0, angle:float=0.0, path:str=None) -> torch.tensor:
+    def forward(self, x:torch.tensor, steps:int=1, fire_rate:float=0.0, path:str=None) -> torch.tensor:
         for step in range(steps):
-            x = self.update(x, fire_rate, angle)
+            x = self.update(x, fire_rate)
             if path:
                 fig = visualizeGO(x[0], True)
                 fig.write_image(f"{path}_{step}.png")
         return x.detach()
 
-    def training_step(self, train_batch:torch.tensor, batch_idx:int) -> float:
+    def training_step(self, train_batch:torch.tensor, batch_idx:int):
         x, target = train_batch
         num_step = randint(self.min_step, self.max_step)
         for step in range(0, num_step):
             x = self.update(x, self.hparams['fire_rate'])
-        loss_growth = F.mse_loss(x[:, :, :, :, :4], target[:,:,:,:,:4])
-        x_2 = self.take_cube(x.detach().clone())
-        for step in range(0, num_step-20):
-            x_2 = self.update(x_2, self.hparams['fire_rate'])
-        loss_reconstructed = F.mse_loss(x_2[:,:,:,:,:4], target[:,:,:,:,:4])
-        loss = (loss_growth + loss_reconstructed)/2
-        self.log("train_lossgrowth", loss_growth)
-        self.log("train_lossreconstructed", loss_reconstructed)
+        loss = F.mse_loss(x[:, :, :, :, :4], target[:,:,:,:,:4])
         self.log("train_loss", loss)
         return {"loss":loss, "out":x.detach()}
 
@@ -109,48 +110,68 @@ class CAModel(pl.LightningModule):
         return inp
 
     def take_cube(self, inp):
-        side = randint(5,8)
-        x,y,z = torch.where(inp[:,:,:,:,3:4] > 0.1)[1:4]
+        x_s, y_s, z_s = inp.shape[1:4]
+        min_side_x, min_side_y, min_side_z = max(3,x_s//5), max(3,y_s//5), max(3,z_s//5)
+        max_side_x, max_side_y, max_side_z = x_s//3, y_s//3, z_s//3
+        if min_side_x > max_side_x or min_side_y > max_side_y or min_side_z > max_side_z:
+            return inp
+        side_x = randint(min_side_x,max_side_x)
+        side_y = randint(min_side_y,max_side_y)
+        side_z = randint(min_side_z,max_side_z)
+        x,y,z = torch.where(inp[:, side_x:x_s-side_x, side_y:y_s-side_y, side_z:z_s-side_z, 3:4] > 0.1)[1:4]
         if len(x) == 0:
             return inp
-        # pdb.set_trace()
         index = randint(0,len(x)-1)
         x,y,z = x[index],y[index],z[index]
-        block = inp[:, max(0,x - side) : x + side, max(0,y - side) : y + side, max(0, z - side) : z + side, :].clone()
+        block = inp[:, max(0,x - side_x) : x + side_x, max(0,y - side_y) : y + side_y, max(0, z - side_z) : z + side_z, :].clone()
+        idx = torch.where((block[:,:,:,:,3:4]>0.1).sum(dim=[1,2,3,4]) >= 64)[0]
+        if len(idx) == 0:
+            return inp
+        inp[idx, :, :, :, :] = 0
+        inp[idx, max(0,x - side_x) : x + side_x, max(0,y - side_y) : y + side_y, max(0, z - side_z) : z + side_z, :] = block[idx].clone()
+        return inp
 
-        # this is to avoid collapse of patterns in pool (it can happen that sometimes it can't reconstruct nothing and in the pool we
-        # will have something that collapse with zero mature/growing cells, so with an empty/ghost object)
-        if block[:,:,:,:,3:4].sum() <= 10: 
-            return inp 
-
-        inp[:, :, :, :, :] = 0
-        inp[:, max(0,x - side) : x + side, max(0,y - side) : y + side, max(0, z - side) : z + side, :] = block.clone()
+    def pertFunc(self, inp, perc):
+        indices = (inp[0,:,:,:,3:4]>0.1)[:,:,:,0].squeeze().nonzero(as_tuple=False)
+        mask = torch.rand(indices.shape[0]) <= perc
+        indices = indices[mask,:]
+        noise = torch.rand(list(inp.shape[1:4])+[16], dtype=inp.dtype, device=self.device)
+        inp[0, indices[:,0], indices[:,1], indices[:,2],:] = noise[indices[:,0],indices[:,1],indices[:,2],:]
         return inp
 
     def validation_step(self, batch, batch_idx):
         x, target = batch
-        x = self(x, steps=randint(self.min_step, self.max_step+1), fire_rate=self.hparams.fire_rate)
-        #pdb.set_trace()
+        x = self(x, steps=self.max_step, fire_rate=self.hparams.fire_rate)
         damaged = self.take_cube(x.detach().clone()) #self.make_cube_damage(x.detach().clone())
         reconstructed = damaged.clone()
-        reconstructed = self(reconstructed, steps=randint(self.min_step, self.max_step+1), fire_rate=self.hparams.fire_rate)
+        reconstructed = self(reconstructed, steps=self.max_step, fire_rate=self.hparams.fire_rate)
         loss = F.mse_loss(x[:,:,:,:,:4], target[:,:,:,:,:4])
-        loss_reconstruction = F.mse_loss(reconstructed[:,:,:,:,:4], x[:,:,:,:,:4])
+        loss_reconstruction = F.mse_loss(reconstructed[:,:,:,:,:4], target[:,:,:,:,:4])
+        perturbated = self.pertFunc(x.detach().clone(), 0.05)
+        pertOut = perturbated.detach().clone()
+        pertOut = self(pertOut, steps=self.max_step, fire_rate=self.hparams.fire_rate)
+        lossPert = F.mse_loss(pertOut[:,:,:,:,:4], target[:,:,:,:,:4])
         self.log("loss_from_seed", loss)
         self.log("loss_reconstructed", loss_reconstruction)
+        self.log("loss_pert", lossPert)
+        if self.trainer.current_epoch == 0:
+            self.trainer.logger.experiment.log({"Target" : visualizeGO(target.squeeze(), target.squeeze().shape[:4])})
         if self.trainer.current_epoch % 2 == 0:
             x = x.squeeze()
             damaged = damaged.squeeze()
             reconstructed = reconstructed.squeeze()
+            pertOut = pertOut.squeeze()
+            perturbated = perturbated.squeeze()
             self.trainer.logger.experiment.log({"DAMAGED - before and after" : visualizeImprovements(x, damaged)})
             self.trainer.logger.experiment.log({"DAMAGED - Growing improvements " : visualizeImprovements(reconstructed, damaged)})
+            self.trainer.logger.experiment.log({"Perturbation - before and after some steps" : visualizeImprovements(perturbated, pertOut)})
         return {"loss_from_seed":loss, "out":x, "damaged":damaged, "reconstructed":reconstructed, "loss_reconstructed":loss_reconstruction}
 
 
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams["lr"], betas=self.hparams["betas"])
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, self.hparams["lr_gamma"])
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50], gamma=0.5, last_epoch=-1) # prev version: milestones=[50,100]
         return {"optimizer":optimizer, "lr_scheduler":scheduler}
 
     def configure_callbacks(self) -> List[pl.Callback]:
