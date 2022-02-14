@@ -25,17 +25,12 @@ def readPLY(path: str) -> np.ndarray:
     return arr.astype(np.float32)
 
 
-def getCentroid(listCoords):
-    sumX, sumY, sumZ = 0.0,0.0,0.0
+def getCentroid(listCoords, perfectCenter):
+    minDist = 100000
+    newCenter = perfectCenter
     for c in listCoords:
-        sumX += c[0]
-        sumY += c[1]
-        sumZ += c[2]
-    sumX /= len(listCoords)
-    sumY /= len(listCoords)
-    sumZ /= len(listCoords)
-    lst = list()
-    for c in listCoords:
-        lst += [abs(int(c[0])-sumX +  int(c[1])-sumY + int(c[2])-sumZ)]
-    val = min(lst)
-    return listCoords[lst.index(val)+len(listCoords)//2]
+        mse = np.square(perfectCenter - c).mean()
+        if mse <= minDist:
+            minDist = mse
+            newCenter = c
+    return newCenter
