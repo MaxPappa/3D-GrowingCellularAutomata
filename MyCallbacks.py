@@ -16,7 +16,6 @@ class PoolSamplerCallback(pl.Callback):
                 idx = range(idx[0], trainer.datamodule.pool.size(0))
             trainer.datamodule.pool[idx] = outputs["out"].detach().cpu().clone()
 
-
 class PoolPatternSampleCallback(pl.Callback):
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, unused=None) -> None:
         if trainer.current_epoch % 5 != 0:

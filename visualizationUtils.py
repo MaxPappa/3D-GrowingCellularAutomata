@@ -3,6 +3,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import torch
+from typing import Tuple
 
 def to_alpha(x):
     return np.clip(x[..., 3:4], 0, 0.9999)
@@ -62,7 +63,7 @@ def visualizePatterns(inpBatch: torch.tensor, num: int):
 
 
 
-def visualizeGO(growedObject: torch.tensor, toSave: bool = False):
+def visualizeGO(growedObject: torch.tensor, xyz: Tuple):
     grow = growedObject.detach().cpu().numpy()
     x,y,z = np.indices(grow.shape[:-1])
     maskTmp = grow[:,:,:,3:4].squeeze()
@@ -84,9 +85,22 @@ def visualizeGO(growedObject: torch.tensor, toSave: bool = False):
     camera = dict(
     eye=dict(x=-.75, y=2.25, z=.2)
     )
-    fig.update_layout(autosize=False, width=250, height=250, margin=dict(l=0,r=0,t=0,b=0), scene_camera=camera)#, template='plotly')
+    #fig.update_layout(autosize=False, width=250, height=250, margin=dict(l=0,r=0,t=0,b=0), scene_camera=camera)#, template='plotly')
+    max_ratio = max(xyz)
+    x_ratio, y_ratio, z_ratio = xyz[0]/max_ratio, xyz[1]/max_ratio, xyz[2]/max_ratio,
+    fig.update_layout(
+        #aspectratio=dict(x=1, y=1, z=0.95),
+        autosize=False,
+        scene = dict(
+            xaxis = dict(nticks=4, range=[0,xyz[0]],),
+            yaxis = dict(nticks=4, range=[0,xyz[1]],),
+            zaxis = dict(nticks=4, range=[0,xyz[2]],),
+            ),
+        width=300,
+        height=250,
+        scene_aspectmode="manual",
+        scene_aspectratio=dict(x=x_ratio,y=y_ratio,z=z_ratio),
+        margin=dict(l=0,r=0,t=0,b=0)
+    )
+
     return fig
-    if toSave:
-        return fig
-    else:
-        fig.show()
