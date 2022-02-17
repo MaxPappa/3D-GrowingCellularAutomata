@@ -120,13 +120,14 @@ while True:
         if damageType == "crop damage":
             out = take_cube(out)
         elif damageType == "simple damage":
-            for i in range(0, dmgTimes):
+            for _ in range(0, dmgTimes):
                 out = make_cube_damage(out)
         elif perc != None and damageType == "replace with random cells":
             out = percentageNoisyCellsChange(out, perc=perc, equal=False)
         fig = visualizeGO(out.squeeze(), xyz=target.shape[:3])
         with plot_spot:
             st.plotly_chart(fig, use_container_width=False, sharing="streamlit")
+        time.sleep(4)
     if i % steps == 0:
         with str_spot:
             st.write("See grown/recovered object. Press R to re-run.")
