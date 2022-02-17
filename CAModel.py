@@ -9,6 +9,7 @@ from Config import ModelConfig
 from dataclasses import asdict
 from MyCallbacks import PoolSamplerCallback
 from random import randint, sample
+from utils import take_cube
 
 class CAModel(pl.LightningModule):
     def __init__(self, hparams: Union[Dict, ModelConfig], min_step:int = 50, max_step: int = 95):
@@ -59,7 +60,6 @@ class CAModel(pl.LightningModule):
 
     def update(self, x:torch.tensor, fire_rate:float) -> torch.tensor:
         x = x.transpose(1,4)
-        # mask = x[:, 3:4, :, :, :]
         pre_life_mask = self.alive(x)
 
         dx = self.perceive(x)
@@ -100,7 +100,7 @@ class CAModel(pl.LightningModule):
 
     def make_cube_damage(self, inp):
         lungh = len(torch.where(inp[:,:,:,:,3:4]>0.1)[0])
-        if lungh <=1:
+        if lungh <=10:
             return inp
         num = sample(range(0,lungh-1), k=1)[0]
         coords = torch.where(inp[:,:,:,:,3:4]>0.1)
@@ -109,29 +109,7 @@ class CAModel(pl.LightningModule):
         inp[:,max(0,x-r):x+r, max(0,y-r):y+r, max(0,z-r):z+r,:] = 0
         return inp
 
-    def take_cube(self, inp):
-        x_s, y_s, z_s = inp.shape[1:4]
-        min_side_x, min_side_y, min_side_z = max(3,x_s//5), max(3,y_s//5), max(3,z_s//5)
-        max_side_x, max_side_y, max_side_z = x_s//3, y_s//3, z_s//3
-        if min_side_x > max_side_x or min_side_y > max_side_y or min_side_z > max_side_z:
-            return inp
-        side_x = randint(min_side_x,max_side_x)
-        side_y = randint(min_side_y,max_side_y)
-        side_z = randint(min_side_z,max_side_z)
-        x,y,z = torch.where(inp[:, side_x:x_s-side_x, side_y:y_s-side_y, side_z:z_s-side_z, 3:4] > 0.1)[1:4]
-        if len(x) == 0:
-            return inp
-        index = randint(0,len(x)-1)
-        x,y,z = x[index],y[index],z[index]
-        block = inp[:, max(0,x - side_x) : x + side_x, max(0,y - side_y) : y + side_y, max(0, z - side_z) : z + side_z, :].clone()
-        idx = torch.where((block[:,:,:,:,3:4]>0.1).sum(dim=[1,2,3,4]) >= 64)[0]
-        if len(idx) == 0:
-            return inp
-        inp[idx, :, :, :, :] = 0
-        inp[idx, max(0,x - side_x) : x + side_x, max(0,y - side_y) : y + side_y, max(0, z - side_z) : z + side_z, :] = block[idx].clone()
-        return inp
-
-    def pertFunc(self, inp, perc):
+    def perturbate(self, inp, perc):
         indices = (inp[0,:,:,:,3:4]>0.1)[:,:,:,0].squeeze().nonzero(as_tuple=False)
         mask = torch.rand(indices.shape[0]) <= perc
         indices = indices[mask,:]
@@ -142,12 +120,12 @@ class CAModel(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, target = batch
         x = self(x, steps=self.max_step, fire_rate=self.hparams.fire_rate)
-        damaged = self.take_cube(x.detach().clone()) #self.make_cube_damage(x.detach().clone())
+        damaged = take_cube(x.detach().clone())
         reconstructed = damaged.clone()
         reconstructed = self(reconstructed, steps=self.max_step, fire_rate=self.hparams.fire_rate)
         loss = F.mse_loss(x[:,:,:,:,:4], target[:,:,:,:,:4])
         loss_reconstruction = F.mse_loss(reconstructed[:,:,:,:,:4], target[:,:,:,:,:4])
-        perturbated = self.pertFunc(x.detach().clone(), 0.05)
+        perturbated = self.perturbate(x.detach().clone(), 0.05)
         pertOut = perturbated.detach().clone()
         pertOut = self(pertOut, steps=self.max_step, fire_rate=self.hparams.fire_rate)
         lossPert = F.mse_loss(pertOut[:,:,:,:,:4], target[:,:,:,:,:4])
@@ -156,7 +134,7 @@ class CAModel(pl.LightningModule):
         self.log("loss_pert", lossPert)
         if self.trainer.current_epoch == 0:
             self.trainer.logger.experiment.log({"Target" : visualizeGO(target.squeeze(), target.squeeze().shape[:4])})
-        if self.trainer.current_epoch % 2 == 0:
+        if self.trainer.current_epoch % self.hparams.log_val_plot_every_n_epoch == 0:
             x = x.squeeze()
             damaged = damaged.squeeze()
             reconstructed = reconstructed.squeeze()
@@ -171,7 +149,7 @@ class CAModel(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams["lr"], betas=self.hparams["betas"])
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50], gamma=0.5, last_epoch=-1) # prev version: milestones=[50,100]
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50,100], gamma=self.hparams.lr_gamma, last_epoch=-1)
         return {"optimizer":optimizer, "lr_scheduler":scheduler}
 
     def configure_callbacks(self) -> List[pl.Callback]:
