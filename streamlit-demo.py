@@ -18,7 +18,7 @@ animal = st.selectbox(
 
 mode = st.selectbox(
     "Select a strategy",
-    ("distillWay", "modifiedWay")
+    ("distillWay", "modifiedWay", "modifiedNoNoiseWay")
 )
 
 damageType = st.selectbox(
@@ -27,10 +27,9 @@ damageType = st.selectbox(
 )
 
 rndm = st.number_input('Insert a number to set torch and random seeds. -1 is avoid manual seeds.', min_value=-1, step=1)
-if rndm == -1:
-    rndm = random.randint(0,1500)
-torch.manual_seed(rndm)
-random.seed(rndm)
+if rndm != -1:
+    torch.manual_seed(rndm)
+    random.seed(rndm)
 
 perc = None
 dmgTimes = None
