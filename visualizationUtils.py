@@ -1,4 +1,5 @@
 
+from matplotlib.pyplot import title
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -92,9 +93,9 @@ def visualizeGO(growedObject: torch.tensor, xyz: Tuple):
         #aspectratio=dict(x=1, y=1, z=0.95),
         autosize=False,
         scene = dict(
-            xaxis = dict(nticks=4, range=[0,xyz[0]],),
-            yaxis = dict(nticks=4, range=[0,xyz[1]],),
-            zaxis = dict(nticks=4, range=[0,xyz[2]],),
+            xaxis = dict(nticks=4, range=[0,xyz[0]], title=""),# visible=False),
+            yaxis = dict(nticks=4, range=[0,xyz[1]], title=""),# visible=False),
+            zaxis = dict(nticks=4, range=[0,xyz[2]], title="")# visible=False),
             ),
         width=300,
         height=250,
@@ -102,5 +103,4 @@ def visualizeGO(growedObject: torch.tensor, xyz: Tuple):
         scene_aspectratio=dict(x=x_ratio,y=y_ratio,z=z_ratio),
         margin=dict(l=0,r=0,t=0,b=0)
     )
-
     return fig
