@@ -5,7 +5,6 @@ from random import randint, sample
 import math
 
 class PoolSamplerCallback(pl.Callback):
-
     def on_train_batch_end(self, trainer:pl.Trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         with torch.no_grad():
             val = math.ceil(len(trainer.datamodule.pool)/trainer.num_training_batches)
@@ -17,6 +16,9 @@ class PoolSamplerCallback(pl.Callback):
             trainer.datamodule.pool[idx] = outputs["out"].detach().cpu().clone()
 
 class PoolPatternSampleCallback(pl.Callback):
+    '''
+        This callback is used to see how the examples are evolving in the pool during training
+    '''    
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, unused=None) -> None:
         if trainer.current_epoch % 5 != 0:
             return
@@ -27,6 +29,9 @@ class PoolPatternSampleCallback(pl.Callback):
             trainer.logger.experiment.log({"Pool patterns" : visualizePatterns(sampled_patterns, 4)})
 
 class GrowImprovementPerEpochLogger(pl.Callback):
+    '''
+        Log improvements of a seed at the end of each 5 epochs
+    '''    
     def __init__(self, seed, target):
         self.seed = seed
         self.target = target

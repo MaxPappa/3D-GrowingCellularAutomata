@@ -5,6 +5,16 @@ import torch
 
 
 def readPLY(path: str) -> np.ndarray:
+    ''' Setup of a numpy tensor starting from a PLY file. Open3D lib is used to read these files.
+        The representation returned consists in a 4D tensor, where the first 3 dimensions are used to contain
+        RGB values in interval [0,1) for coordinates xyz, and the last dimension contains the RGBA channels.
+
+    Args:
+        path (str): path of the file to be read
+
+    Returns:
+        np.ndarray: 4D representation of the read file
+    '''    
     cloud = o3d.io.read_point_cloud(path)
     xyz = np.asarray(cloud.points)
     colors = np.asarray(cloud.colors)
@@ -27,7 +37,22 @@ def readPLY(path: str) -> np.ndarray:
     return arr.astype(np.float32)
 
 
-def getCentroid(listCoords, perfectCenter):
+def getCentroid(listCoords: list, perfectCenter:np.array):
+    ''' return the position of voxel, which is one of the target voxels, that is
+        closest to the center of space.
+        This is a necessary operation, because if used the center of space, it may happen that
+        this position is not used as voxel in the target object, and the model will learn nothing at all.
+        The MSE loss can't be reduced due to a starting point that initially has a value of 1.0 in the alpha channel
+        that is very diffult to remove at the first steps, meaning that the model will just prefer to learning nothing at all
+        to reduce the loss.
+
+    Args:
+        listCoords (list): list of triplets containing positions x, y and z
+        perfectCenter (np.array): center position of the 3D space
+
+    Returns:
+        np.array: (xyz) coordinates of the voxel to use as starting seed.
+    '''    
     minDist = 100000
     newCenter = perfectCenter
     for c in listCoords:
@@ -37,7 +62,15 @@ def getCentroid(listCoords, perfectCenter):
             newCenter = c
     return newCenter
 
-def take_cube(inp):
+def take_cube(inp: torch.Tensor) -> torch.Tensor:
+    ''' Given an input batch, this function will pick and then return a section of each batch example.
+
+    Args:
+        inp (torch.Tensor): input batch
+
+    Returns:
+        torch.Tensor: batch with the cropped/cut-out sections of input batch
+    '''    
     x_s, y_s, z_s = inp.shape[1:4]
     min_side_x, min_side_y, min_side_z = max(3,x_s//5), max(3,y_s//5), max(3,z_s//5)
     max_side_x, max_side_y, max_side_z = x_s//3, y_s//3, z_s//3

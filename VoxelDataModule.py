@@ -58,7 +58,15 @@ class VoxelDataModule(pl.LightningDataModule):
         return DataLoader(simple, batch_size=1, num_workers=self.hparams.num_workers)
 
 
-    def make_cube_damage(self, batch):
+    def make_cube_damage(self, batch: torch.Tensor) -> torch.Tensor:
+        ''' make cube-shaped damage to the input batch
+
+        Args:
+            batch (torch.Tensor): input batch to damage
+
+        Returns:
+            torch.Tensor: damaged input batch
+        '''        
         for anim in batch[:1]:
             lungh = len(torch.where(anim[:,:,:,3:4]>0.1)[0])
             if lungh <= 10:
@@ -70,7 +78,17 @@ class VoxelDataModule(pl.LightningDataModule):
             anim[max(0,x-r):x+r, max(0,y-r):y+r, max(0,z-r):z+r,:] = 0
         return batch
 
-    def perturbate(self, inp, perc):
+    def perturbate(self, inp: torch.Tensor, perc: float) -> torch.Tensor:
+        ''' for each example in the input batch (inp), replace in a different manner
+            a percentage (perc) of cells with some random values. 
+
+        Args:
+            inp (torch.Tensor): input batch
+            perc (float): percentage of cells to replace
+
+        Returns:
+            torch.Tensor: input batch where some voxels are replaced with noisy values.
+        '''        
         for i in range(0, inp.shape[0]):
             indices = (inp[i,:,:,:,3:4]>0.1)[:,:,:,0].squeeze().nonzero(as_tuple=False)
             mask = torch.rand(indices.shape[0]) <= perc

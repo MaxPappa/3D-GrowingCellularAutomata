@@ -8,7 +8,18 @@ from torch.nn.functional import mse_loss
 import random
 from utils import take_cube
 
-def evaluate(animalName:str, plyFileName:str, trainMode:str, repeat_num:int=64):
+def evaluate(animalName:str, plyFileName:str, trainMode:str, repeat_num:int=64) -> None:
+    '''_summary_
+
+    Args:
+        animalName (str): type of animal
+        plyFileName (str): name of PLY file to read
+        trainMode (str): training mode checkpoint to use (distillWay, modifiedWay, modifiedNoNoiseWay)
+        repeat_num (int, optional): number of examples to compute. Defaults to 64.
+
+    Returns:
+        None: no returned value, function used just to print things.
+    '''    
     # setting all seed for reproducibility purposes
     print(f"### Starting evaluation for {animalName} with training mode {trainMode} ###")
     torch.manual_seed(42)

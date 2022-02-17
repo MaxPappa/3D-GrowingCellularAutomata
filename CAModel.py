@@ -24,6 +24,7 @@ class CAModel(pl.LightningModule):
             self.fc1.weight.zero_()
         self.automatic_optimization = True
 
+        # 3D sobel kernel
         kernel = torch.tensor([[[-1,  0,  1],
                 [-2,  0,  2],
                 [-1,  0,  1]],
@@ -43,11 +44,26 @@ class CAModel(pl.LightningModule):
         self.register_buffer("kernel_z", kernel.transpose(0,2)[None,None,...].repeat(self.hparams.n_channels,1,1,1,1))
 
 
-    def alive(self, x):
+    def alive(self, x: torch.Tensor):
+        ''' perception of mature, dead and growing cells
+
+        Args:
+            x (torch.Tensor): input batch
+
+        Returns:
+            torch.Tensor: boolean mask to use when filtering out dead cells
+        '''        
         return F.max_pool3d(x[:, 3:4, :, :, :], kernel_size=3, stride=1, padding=1) > 0.1
 
-    def perceive(self, x):
+    def perceive(self, x: torch.Tensor) -> torch.Tensor:
+        ''' perceive neighbour voxels using moore neighborhood adapted to 3D objects (using 3 dimensions instead of 2)
 
+        Args:
+            x (torch.Tensor): input batch
+
+        Returns:
+            torch.Tensor: processed input batch
+        '''        
         def _perceive_with(x, kernel):
             return F.conv3d(x, kernel, padding=1, groups=self.hparams.n_channels)
 
@@ -58,7 +74,16 @@ class CAModel(pl.LightningModule):
         y = torch.cat((x,y1,y2,y3),1)
         return y
 
-    def update(self, x:torch.tensor, fire_rate:float) -> torch.tensor:
+    def update(self, x:torch.Tensor, fire_rate:float) -> torch.Tensor:
+        ''' single step of update rule
+
+        Args:
+            x (torch.Tensor): input batch
+            fire_rate (float): value to use when doing a stochastic update of cells. 0.5 is the ideal value to use when simulating multicellular organism cells
+
+        Returns:
+            torch.Tensor: updated input batch
+        '''        
         x = x.transpose(1,4)
         pre_life_mask = self.alive(x)
 
@@ -98,7 +123,15 @@ class CAModel(pl.LightningModule):
         self.log("train_loss", loss)
         return {"loss":loss, "out":x.detach()}
 
-    def make_cube_damage(self, inp):
+    def make_cube_damage(self, inp: torch.Tensor) -> torch.Tensor:
+        ''' damage input batch in a random way
+
+        Args:
+            inp (torch.Tensor): input batch to damage
+
+        Returns:
+            torch.Tensor: damaged input batch
+        '''        
         lungh = len(torch.where(inp[:,:,:,:,3:4]>0.1)[0])
         if lungh <=10:
             return inp
@@ -109,7 +142,16 @@ class CAModel(pl.LightningModule):
         inp[:,max(0,x-r):x+r, max(0,y-r):y+r, max(0,z-r):z+r,:] = 0
         return inp
 
-    def perturbate(self, inp, perc):
+    def perturbate(self, inp:torch.Tensor, perc:float) -> torch.tensor:
+        ''' replace random cells with random noisy values
+
+        Args:
+            inp (torch.Tensor): input batch
+            perc (float): percentage of voxels to replace
+
+        Returns:
+            torch.Tensor: input batch where random voxels are replaced with random values.
+        '''        
         indices = (inp[0,:,:,:,3:4]>0.1)[:,:,:,0].squeeze().nonzero(as_tuple=False)
         mask = torch.rand(indices.shape[0]) <= perc
         indices = indices[mask,:]

@@ -1,19 +1,34 @@
 
-from matplotlib.pyplot import title
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import torch
 from typing import Tuple
 
-def to_alpha(x):
+def to_alpha(x: np.ndarray) -> np.ndarray:
+    ''' normalize alpha values in the interval [0,1)
+
+    Args:
+        x (np.ndarray): input numpy array containing 4D representation of the object
+
+    Returns:
+        np.ndarray: input array where values of alpha channel are normalized in the interval [0,1)
+    '''    
     return np.clip(x[..., 3:4], 0, 0.9999)
 
-def to_rgb(x):
+def to_rgb(x: np.ndarray) -> np.ndarray:
+    ''' calculate RGB values to plot
+
+    Args:
+        x (np.ndarray): input numpy array
+
+    Returns:
+        np.ndarray: modified input numpy array
+    '''    
     rgb, a = x[..., :3], to_alpha(x)
     return np.clip(1.0-a+rgb , 0, 0.9999)
 
-def visualizeImprovements(output: torch.tensor, groundTruth: torch.tensor):
+def visualizeImprovements(output: torch.Tensor, groundTruth: torch.Tensor):
     out = output.detach().cpu().numpy()
     gt = groundTruth.detach().cpu().numpy()
     x,y,z = np.indices(out.shape[:-1])
