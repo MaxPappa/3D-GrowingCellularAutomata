@@ -23,3 +23,15 @@ For each animal object there are 3 checkpoints:
 * **distillWay** which is the strategy reproduced from GNCA distill paper, adapted to 3D objects. To reproduce this, just set modifiedTrainingMode to False in DataModuleConfig.
 * **modifiedNoNoiseWay** which consists in using a cropped/cut-out damage at the spot of the simple type of damage. To reproduce this, set modifiedTrainingMode to True and randomNoise to False.
 * **modifiedWay** same as modifiedNoNoiseWay but using also a random substitution of cells with random values to let the model persist/recover even in very strange states. To reproduce this, set modifiedTrainingMode and randomNoise to True.
+___
+
+## Large Puffin examples
+
+### Simple damage
+![modifiedWay-simpleDamage](./gifs/modifiedWay-simpleDamage.gif)
+---
+### Crop/Cut-out section
+![modifiedWay-cropDamage](./gifs/modifiedWay-cropDamage.gif)
+---
+### Random values replaced at the spot of some cells
+![modifiedWay-randomCells](./gifs/modifiedWay-randomCells.gif)
