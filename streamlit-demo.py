@@ -11,6 +11,9 @@ import random
 
 st.title("3D Growing Cellular Automata")
 
+plot_spot = st.empty()
+str_spot = st.empty()
+
 animal = st.selectbox(
     "Select an animal",
     ('largepuffin', 'kangaroo', 'oryx', 'wildebeest', 'ostrich')
@@ -97,8 +100,6 @@ out = seed[None,...].clone()
 
 #random.seed(42)
 
-plot_spot = st.empty()
-str_spot = st.empty()
 flag = True
 i = 0
 while True:
