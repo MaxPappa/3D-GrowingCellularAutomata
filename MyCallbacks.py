@@ -5,6 +5,9 @@ from random import randint, sample
 import math
 
 class PoolSamplerCallback(pl.Callback):
+    ''' After each train step ends, this callback is called to push computed and updated examples into
+        the pool of examples that is sampled before the start of each training step
+    '''    
     def on_train_batch_end(self, trainer:pl.Trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         with torch.no_grad():
             val = math.ceil(len(trainer.datamodule.pool)/trainer.num_training_batches)
