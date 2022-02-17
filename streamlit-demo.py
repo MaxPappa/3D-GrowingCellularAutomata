@@ -1,6 +1,4 @@
-from matplotlib.pyplot import flag
 import streamlit as st
-from validators import Min
 from visualizationUtils import visualizeGO
 # from streamlit_plotly_events import plotly_events
 from utils import readPLY, getCentroid, take_cube
@@ -14,12 +12,12 @@ import random
 st.title("3D Growing Cellular Automata")
 
 animal = st.selectbox(
-    "Chose an animal",
+    "Select an animal",
     ('largepuffin', 'kangaroo', 'oryx', 'wildebeest', 'ostrich')
 )
 
 mode = st.selectbox(
-    "Chose a strategy",
+    "Select a strategy",
     ("distillWay", "modifiedWay")
 )
 
@@ -68,26 +66,6 @@ def make_cube_damage(inp):
     r = random.randint(5,8)
     inp[:,max(0,x-r):x+r, max(0,y-r):y+r, max(0,z-r):z+r,:] = 0
     return inp
-
-# def take_cube(inp):
-#     x_s, y_s, z_s = inp.shape[1:4]
-#     min_side_x, min_side_y, min_side_z = max(3,x_s//5), max(3,y_s//5), max(3,z_s//5)
-#     max_side_x, max_side_y, max_side_z = x_s//3, y_s//3, z_s//3
-#     side_x = random.randint(min_side_x,max_side_x)
-#     side_y = random.randint(min_side_y,max_side_y)
-#     side_z = random.randint(min_side_z,max_side_z)
-#     x,y,z = torch.where(inp[:, side_x:x_s-side_x, side_y:y_s-side_y, side_z:z_s-side_z, 3:4] > 0.1)[1:4]
-#     if len(x) == 0:
-#         return inp
-#     index = random.randint(0,len(x)-1)
-#     x,y,z = x[index],y[index],z[index]
-#     block = inp[:, max(0,x - side_x) : x + side_x, max(0,y - side_y) : y + side_y, max(0, z - side_z) : z + side_z, :].clone()
-#     if (block[:,:,:,:,3:4] > 0.1).sum() <= 10: 
-#         return inp
-
-#     inp[:, :, :, :, :] = 0
-#     inp[:, max(0,x - side_x) : x + side_x, max(0,y - side_y) : y + side_y, max(0, z - side_z) : z + side_z, :] = block.clone()
-#     return inp
 
 def percentageNoisyCellsChange(inp, perc, equal=True):
     indices = (inp[:, :, :, :, 3:4] > 0.1)[0,:, :, :, 0].squeeze().nonzero(as_tuple=False)
