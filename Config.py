@@ -16,7 +16,8 @@ class ModelConfig:
 
 @dataclass
 class DataModuleConfig:
-    filePath: str = "./plyFiles/large puffin.ply"
+    animalName: str = "largepuffin"
+    filePath: str = "./plyFiles/largepuffin.ply"
     channels: int = 16
     pool_size: int = 128
     batch_size: int = 4
