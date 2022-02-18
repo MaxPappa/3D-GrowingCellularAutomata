@@ -8,7 +8,7 @@ from torch.nn.functional import mse_loss
 import random
 from utils import take_cube
 
-def evaluate(animalName:str, plyFileName:str, trainMode:str, repeat_num:int=64) -> None:
+def evaluate(animalName:str, plyFileName:str, trainMode:str, repeat_num:int=64, perc:float=0.8) -> None:
     '''_summary_
 
     Args:
@@ -53,7 +53,7 @@ def evaluate(animalName:str, plyFileName:str, trainMode:str, repeat_num:int=64) 
     ca_model = ca_model.cuda()
 
     steps = 250
-    out = seed[None,...].detach().clone()
+    # out = seed[None,...].detach().clone()
 
     inpSeed = seed[None,...].cuda()
     inpSeed = ca_model(inpSeed, steps=steps, fire_rate=cfgModel.fire_rate)
@@ -105,16 +105,53 @@ def evaluate(animalName:str, plyFileName:str, trainMode:str, repeat_num:int=64) 
         random_seed_loss += mse_loss(computed.squeeze()[:,:,:,:4], target)
     random_seed_loss /= repeat_num
     print(f"grow from random position seed {random_seed_loss}")
+
+
+    def percentageNoisyCellsChange(inp, perc):
+        indices = (inp[:, :, :, :, 3:4] > 0.1)[0,:, :, :, 0].squeeze().nonzero(as_tuple=False)
+        mask = torch.rand(indices.shape[0]) <= perc
+        indices = indices[mask,:]
+        lstNoise = []
+        for i in range(0, 16):
+            indices = (inp[:, :, :, :, 3:4] > 0.1)[0,:, :, :, 0].squeeze().nonzero(as_tuple=False)
+            mask = torch.rand(indices.shape[0]) <= perc
+            indices = indices[mask,:]
+            noise = torch.rand(list(inp.shape[1:4]), dtype=inp.dtype).cuda()
+            lstNoise += [noise]
+            inp[:, indices[:,0], indices[:,1], indices[:,2],i] = noise[indices[:,0],indices[:,1],indices[:,2]]
+        return inp
+
+    batch_x_noisy = percentageNoisyCellsChange(batch_x, perc)
+    reconstruct_noisy_loss = 0
+    for i in range(0, repeat_num):
+        computed = ca_model(batch_x_noisy[i][None,...], steps=steps, fire_rate=cfgModel.fire_rate)
+        reconstruct_noisy_loss += mse_loss(computed.squeeze()[:,:,:,:4], target)
+
+    reconstruct_noisy_loss /= repeat_num
+    print(f"recover from random noisy values [perc={perc}] {reconstruct_noisy_loss}")
+
     print(f"### The End ###\n")
 
 if __name__ == '__main__':
-    evaluate("ostrich", "ostrich.ply", "distillWay", 64)
-    evaluate("ostrich", "ostrich.ply", "modifiedWay", 64)
-    evaluate("largepuffin", "largepuffin.ply", "distillWay", 64)
-    evaluate("largepuffin", "largepuffin.ply", "modifiedWay", 64)
-    evaluate("oryx", "oryx.ply", "distillWay", 64)
-    evaluate("oryx", "oryx.ply", "modifiedWay", 64)
-    evaluate("kangaroo", "kangaroo.ply", "distillWay", 64)
-    evaluate("kangaroo", "kangaroo.ply", "modifiedWay", 64)
-    evaluate("Wildebeest", "Wildebeest.ply", "distillWay", 64)
-    evaluate("Wildebeest", "Wildebeest.ply", "modifiedWay", 64)
+    perc = 0.8
+    repeat_num = 64
+    print("##### Ostrich starting #####\n")
+    evaluate("ostrich", "ostrich.ply", "distillWay", repeat_num, perc)
+    evaluate("ostrich", "ostrich.ply", "modifiedWay", repeat_num, perc)
+    evaluate("ostrich", "ostrich.ply", "modifiedNoNoiseWay", repeat_num, perc)
+    print("##### LargePuffin starting #####\n")
+    evaluate("largepuffin", "largepuffin.ply", "distillWay", repeat_num, perc)
+    evaluate("largepuffin", "largepuffin.ply", "modifiedWay", repeat_num, perc)
+    evaluate("largepuffin", "largepuffin.ply", "modifiedNoNoiseWay", repeat_num, perc)
+    print("##### Oryx starting #####\n")
+    evaluate("oryx", "oryx.ply", "distillWay", repeat_num, perc)
+    evaluate("oryx", "oryx.ply", "modifiedWay", repeat_num, perc)
+    evaluate("oryx", "oryx.ply", "modifiedNoNoiseWay", repeat_num, perc)
+    print("##### Kangaroo starting #####\n")
+    evaluate("kangaroo", "kangaroo.ply", "distillWay", repeat_num, perc)
+    evaluate("kangaroo", "kangaroo.ply", "modifiedWay", repeat_num, perc)
+    evaluate("kangaroo", "kangaroo.ply", "modifiedNoNoiseWay", repeat_num, perc)
+    print("##### Wildebeest starting #####\n")
+    evaluate("Wildebeest", "Wildebeest.ply", "distillWay", repeat_num, perc)
+    evaluate("Wildebeest", "Wildebeest.ply", "modifiedWay", repeat_num, perc)
+    evaluate("Wildebeest", "Wildebeest.ply", "modifiedNoNoiseWay", repeat_num, perc)

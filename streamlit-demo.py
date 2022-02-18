@@ -29,11 +29,6 @@ damageType = st.selectbox(
     ("simple damage", "crop damage", "start from random seed", "replace with random cells")
 )
 
-rndm = st.number_input('Insert a number to set torch and random seeds. -1 is avoid manual seeds.', min_value=-1, step=1)
-if rndm != -1:
-    torch.manual_seed(rndm)
-    random.seed(rndm)
-
 perc = None
 dmgTimes = None
 
@@ -41,6 +36,11 @@ if damageType == "replace with random cells":
     perc = st.slider("percentage of cells (RGBA and 12 hidden cell states) to replace with random values", 0.0, 1.0, 0.01)
 elif damageType == "simple damage":
     dmgTimes = st.slider("number of times the object will be damaged in different positions", 1, 10, 1)
+
+rndm = st.number_input('Insert a number to set torch and random seeds. -1 is avoid manual seeds.', min_value=-1, step=1)
+if rndm != -1:
+    torch.manual_seed(rndm)
+    random.seed(rndm)
 
 listCoords = []
 target = readPLY(f"./plyFiles/{animal}.ply")
